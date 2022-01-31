@@ -254,6 +254,9 @@ def _can_enroll_courselike(user, courselike):
     # which actually points to a CourseKey. Sigh.
     course_key = courselike.id
 
+    if course_key.deprecated:  # we no longer support enrolling in Old Mongo courses
+        return ACCESS_DENIED
+
     # If the user appears in CourseEnrollmentAllowed paired with the given course key,
     # they may enroll, except if the CEA has already been used by a different user.
     # Note that as dictated by the legacy database schema, the filter call includes
@@ -329,6 +332,9 @@ def _has_access_course(user, action, courselike):
         # ).or(
         #     _has_staff_access_to_descriptor, user, courselike, courselike.id
         # )
+        if courselike.id.deprecated:  # we no longer support accessing Old Mongo courses
+            return ACCESS_DENIED
+
         visible_to_nonstaff = _visible_to_nonstaff_users(courselike)
         if not visible_to_nonstaff:
             staff_access = _has_staff_access_to_descriptor(user, courselike, courselike.id)
@@ -883,6 +889,8 @@ def _has_catalog_visibility(course, visibility_type):
     """
     Returns whether the given course has the given visibility type
     """
+    if course.id.deprecated:  # we no longer support Old Mongo courses
+        return ACCESS_DENIED
     return ACCESS_GRANTED if course.catalog_visibility == visibility_type else ACCESS_DENIED
 
 

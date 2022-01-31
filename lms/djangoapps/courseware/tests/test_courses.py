@@ -54,7 +54,6 @@ TEST_DATA_DIR = settings.COMMON_TEST_DATA_ROOT
 @ddt.ddt
 class CoursesTest(ModuleStoreTestCase):
     """Test methods related to fetching courses."""
-    MODULESTORE = TEST_DATA_MONGO_AMNESTY_MODULESTORE
     ENABLED_SIGNALS = ['course_published']
     GET_COURSE_WITH_ACCESS = 'get_course_with_access'
     GET_COURSE_OVERVIEW_WITH_ACCESS = 'get_course_overview_with_access'
@@ -89,8 +88,21 @@ class CoursesTest(ModuleStoreTestCase):
         assert error.value.access_response.error_code == 'not_visible_to_user'
         assert not error.value.access_response.has_access
 
+    @ddt.data(GET_COURSE_WITH_ACCESS, GET_COURSE_OVERVIEW_WITH_ACCESS)
+    def test_old_mongo_access_error(self, course_access_func_name):
+        course_access_func = self.COURSE_ACCESS_FUNCS[course_access_func_name]
+        user = UserFactory.create()
+        with self.store.default_store(ModuleStoreEnum.Type.mongo):
+            course = CourseFactory.create()
+
+        with pytest.raises(CoursewareAccessException) as error:
+            course_access_func(user, 'load', course.id)
+        assert str(error.value) == 'Course not found.'
+        assert error.value.access_response.error_code is None
+        assert not error.value.access_response.has_access
+
     @ddt.data(
-        (GET_COURSE_WITH_ACCESS, 1),
+        (GET_COURSE_WITH_ACCESS, 3),
         (GET_COURSE_OVERVIEW_WITH_ACCESS, 0),
     )
     @ddt.unpack
@@ -370,11 +382,11 @@ class CourseInstantiationTests(ModuleStoreTestCase):
 
         self.factory = RequestFactory()
 
-    @ddt.data(*itertools.product(range(5), [ModuleStoreEnum.Type.mongo, ModuleStoreEnum.Type.split], [None, 0, 5]))
+    @ddt.data(*itertools.product(range(5), [None, 0, 5]))
     @ddt.unpack
-    def test_repeated_course_module_instantiation(self, loops, default_store, course_depth):
+    def test_repeated_course_module_instantiation(self, loops, course_depth):
 
-        with modulestore().default_store(default_store):
+        with modulestore().default_store(ModuleStoreEnum.Type.split):
             course = CourseFactory.create()
             chapter = ItemFactory(parent=course, category='chapter', graded=True)
             section = ItemFactory(parent=chapter, category='sequential')
